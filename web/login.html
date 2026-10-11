@@ -1,0 +1,28 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · todo</title>
+<link rel="stylesheet" href="/css/v3.css"><link rel="stylesheet" href="/css/extra.css"></head>
+<body>
+<header class="nav"><a class="logo" href="/"><span class="lg" id="lg"></span><b>todo<i>.</i></b></a></header>
+<main class="login-wrap"><form class="login-card" id="f" autocomplete="off">
+ <span class="eyebrow"><svg viewBox="-10 -10 20 20"><path d="M0 -9 l3 7 7 1 -5 5 1 7 -6 -4 -6 4 1 -7 -5 -5 7 -1z" fill="#ff6f91" stroke="#3b2f4a" stroke-width="2.5" stroke-linejoin="round"/></svg>HELLO · 只有你能进来</span>
+ <div style="margin-top:26px"><div class="tiles"><span class="tile c-pink">登</span><span class="tile c-lav">录</span></div></div>
+ <p class="lede">这是你自己的看板。密码是部署时的 <b>OWNER_PASSWORD</b>。</p>
+ <label class="fl" for="pw">密码</label>
+ <input class="inp big" id="pw" type="password" name="password" required autofocus>
+ <p class="merr" id="err"></p>
+ <button class="b ink lg" type="submit">进去</button>
+</form></main>
+<script src="/js/pets.js"></script>
+<script>
+document.getElementById("lg").innerHTML = PETHEAD(PETS.gen("todo"), "normal");
+fetch("/api/me").then(function(r){ if(r.ok) location.href="/"; });
+document.getElementById("f").addEventListener("submit", function(e){
+  e.preventDefault();
+  var err = document.getElementById("err");
+  err.textContent = "";
+  fetch("/api/login", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({password:document.getElementById("pw").value})})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+    .then(function(x){ if(!x.ok){ err.textContent = x.d.error || "密码不对"; return; } location.href="/"; })
+    .catch(function(){ err.textContent = "网络不行"; });
+});
+</script>
+</body></html>

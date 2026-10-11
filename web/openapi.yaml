@@ -1,0 +1,495 @@
+openapi: 3.0.3
+info:
+  title: todo-board
+  version: 0.1.0
+  description: |
+    一个人自己部署的待办看板。主人用登录会话操作界面和全部数据；
+    每个 Agent 用自己的 Bearer token；公开登记走 `/api/intake`。
+    同一个进程还提供 MCP：`POST /mcp`。
+servers:
+  - url: /
+tags:
+  - name: auth
+  - name: todos
+  - name: questions
+  - name: inbox
+  - name: agents
+  - name: projects
+  - name: intake
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+paths:
+  /api/health:
+    get:
+      tags: [auth]
+      security: []
+      summary: 健康检查
+      responses:
+        "200":
+          description: ok
+  /api/login:
+    post:
+      tags: [auth]
+      security: []
+      summary: 主人登录，设置会话 cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: {type: string}
+      responses:
+        "200": {description: 已登录}
+        "401": {description: 密码不对}
+  /api/logout:
+    post:
+      tags: [auth]
+      summary: 退出
+      responses:
+        "200": {description: 已退出}
+  /api/me:
+    get:
+      tags: [auth]
+      summary: 当前主人
+      responses:
+        "200": {description: 名字和形象}
+        "401": {description: 先登录}
+  /api/board:
+    get:
+      tags: [todos]
+      summary: 看板快照（只给主人，界面用）
+      description: 一次返回项目、Agent、todo、待确认的问题和收件箱。
+      responses:
+        "200": {description: 看板}
+  /api/todos:
+    get:
+      tags: [todos]
+      summary: 列出 todo
+      description: 主人看到全部。Agent token 只看到自己泳道（delegate 是自己）。
+      parameters:
+        - in: query
+          name: status
+          schema: {type: string, enum: [todo, in_progress, waiting, done]}
+        - in: query
+          name: project
+          schema: {type: string}
+          description: 项目 id 或项目名
+        - in: query
+          name: lane
+          schema: {type: string}
+          description: self、others 或 Agent id。仅主人有效
+        - in: query
+          name: q
+          schema: {type: string}
+          description: 标题或说明里的关键字
+      responses:
+        "200":
+          description: 列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  todos:
+                    type: array
+                    items: {$ref: "#/components/schemas/Todo"}
+    post:
+      tags: [todos]
+      summary: 新建 todo
+      description: |
+        主人新建的默认在「今天」（lane=self）。可以带 delegate_id 直接交给某个 Agent。
+        Agent 新建的 source=agent，执行者是它自己。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: {type: string}
+                description: {type: string}
+                note: {type: string}
+                project_id: {type: string}
+                project: {type: string, description: 项目名，和 project_id 二选一}
+                due: {type: string}
+                status: {type: string, enum: [todo, in_progress]}
+                steps: {type: array, items: {type: string}}
+                step: {type: integer, description: 当前步骤，从 1 开始}
+                delegate_id: {type: string, description: 仅主人。Agent id，留空表示自己做}
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Todo"}
+  /api/todos/{id}:
+    parameters:
+      - $ref: "#/components/parameters/TodoId"
+    get:
+      tags: [todos]
+      summary: 一条 todo，带动态和未回答的问题
+      responses:
+        "200": {description: 详情}
+        "404": {description: 找不到}
+    patch:
+      tags: [todos]
+      summary: 修改 todo
+      description: |
+        只传要改的字段。Agent 只能改自己泳道，不能改执行人，也不能用这个接口标完成。
+        认领就是把 status 改成 in_progress。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: {type: string}
+                description: {type: string}
+                note: {type: string}
+                project_id: {type: string, description: 空字符串表示移出项目}
+                project: {type: string}
+                due: {type: string}
+                status: {type: string, enum: [todo, in_progress, done]}
+                steps: {type: array, items: {type: string}}
+                step: {type: integer}
+                delegate_id: {type: string, description: 仅主人。空字符串表示改回自己}
+      responses:
+        "200": {description: 已更新}
+    delete:
+      tags: [todos]
+      summary: 删除 todo（仅主人）
+      responses:
+        "200": {description: 已删除}
+  /api/todos/{id}/complete:
+    post:
+      tags: [todos]
+      summary: 标完成
+      description: Agent 可以把自己的 todo 标完成，没有单独的验收步骤。
+      parameters:
+        - $ref: "#/components/parameters/TodoId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string}
+      responses:
+        "200": {description: 已完成}
+  /api/todos/{id}/comments:
+    post:
+      tags: [todos]
+      summary: 写一条进度或备注
+      parameters:
+        - $ref: "#/components/parameters/TodoId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: {type: string}
+      responses:
+        "201": {description: 已写入动态}
+  /api/questions:
+    get:
+      tags: [questions]
+      summary: 还没回答的问题（仅主人）
+      responses:
+        "200": {description: 列表}
+    post:
+      tags: [questions]
+      summary: Agent 向主人提问
+      description: 不带 todo_id 时会新建一条 todo。状态变成 waiting，出现在首页「待确认」。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                todo_id: {type: string}
+                title: {type: string}
+                question: {type: string}
+                context: {type: string}
+                options:
+                  type: array
+                  items: {type: string}
+                  description: 2 到 4 个。不传则默认「可以 / 先不要」
+      responses:
+        "201": {description: 已提问}
+  /api/questions/{id}/answer:
+    post:
+      tags: [questions]
+      summary: 主人回答
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [option]
+              properties:
+                option: {type: string}
+      responses:
+        "200": {description: todo 回到 in_progress}
+  /api/inbox:
+    get:
+      tags: [inbox]
+      summary: 收件箱（仅主人）
+      parameters:
+        - in: query
+          name: status
+          schema: {type: string, enum: [pending, accepted, declined], default: pending}
+      responses:
+        "200": {description: 登记列表}
+  /api/inbox/{id}/accept:
+    post:
+      tags: [inbox]
+      summary: 接受登记并决定谁来做
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignee]
+              properties:
+                assignee: {type: string, description: owner，或 Agent id / 名字}
+      responses:
+        "200": {description: 已生成 todo}
+  /api/inbox/{id}/decline:
+    post:
+      tags: [inbox]
+      summary: 拒绝登记
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: 已拒绝}
+  /api/intake:
+    get:
+      tags: [intake]
+      security: []
+      summary: 公开登记页需要的文案和形象
+      responses:
+        "200": {description: 名字、介绍、是否要求 token}
+    post:
+      tags: [intake]
+      security: []
+      summary: 提交一条登记
+      description: |
+        默认匿名可提交（INTAKE_MODE=open）。
+        INTAKE_MODE=token 时必须带 Authorization: Bearer $INTAKE_TOKEN，或 JSON 里的 token 字段。
+        Agent 用自己的 token 调用时，记成登记 API，默认署名是这个 Agent。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: {type: string}
+                body: {type: string}
+                name: {type: string}
+                contact: {type: string}
+                want: {type: string}
+                kind: {type: string, enum: [human, agent]}
+                suggest: {type: string, description: 建议交给哪个 Agent，填名字}
+                token: {type: string}
+      responses:
+        "201": {description: 已进收件箱，还没上看板}
+        "401": {description: 需要登记 token}
+  /api/agents:
+    get:
+      tags: [agents]
+      summary: Agent 列表（仅主人，不含完整 token）
+      responses:
+        "200": {description: 列表}
+    post:
+      tags: [agents]
+      summary: 创建 Agent，响应里带一次性 token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string}
+                role: {type: string}
+                look: {$ref: "#/components/schemas/Look"}
+      responses:
+        "201": {description: agent 和 token}
+  /api/agents/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string}
+    patch:
+      tags: [agents]
+      summary: 改名字、职责或形象
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                role: {type: string}
+                look: {$ref: "#/components/schemas/Look"}
+      responses:
+        "200": {description: 已保存}
+    delete:
+      tags: [agents]
+      summary: 删除 Agent，它的 todo 转回主人
+      responses:
+        "200": {description: 已删除}
+  /api/agents/{id}/token:
+    post:
+      tags: [agents]
+      summary: 重新生成 token，旧的立即失效
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: 新 token，只这一次}
+  /api/agents/{id}/revoke:
+    post:
+      tags: [agents]
+      summary: 吊销 token
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: 已吊销}
+  /api/projects:
+    get:
+      tags: [projects]
+      summary: 项目列表（仅主人）
+      responses:
+        "200": {description: 列表}
+    post:
+      tags: [projects]
+      summary: 新建项目
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string}
+                color: {type: string, enum: [mint, blue, yellow, pink, lav, peach]}
+      responses:
+        "201": {description: 已创建}
+  /api/projects/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string}
+    patch:
+      tags: [projects]
+      summary: 改名或换颜色
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                color: {type: string}
+      responses:
+        "200": {description: 已保存}
+    delete:
+      tags: [projects]
+      summary: 删除项目，todo 变成没归项目
+      responses:
+        "200": {description: 已删除}
+  /mcp:
+    post:
+      tags: [todos]
+      summary: MCP Streamable HTTP
+      description: |
+        JSON-RPC 2.0。支持 initialize、ping、tools/list、tools/call。
+        工具：list_todos、create_todo、update_todo、complete_todo、ask_owner、submit_to_intake。
+        Agent 用 Bearer token。INTAKE_MODE=open 时，不带 token 只能 submit_to_intake。
+      responses:
+        "200": {description: JSON-RPC 响应}
+        "202": {description: 通知}
+        "401": {description: token 无效}
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: tb_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    TodoId:
+      in: path
+      name: id
+      required: true
+      schema: {type: string}
+  schemas:
+    Look:
+      type: object
+      properties:
+        ear: {type: string, enum: [cat, bunny, bear, mouse, fox, sprout]}
+        color: {type: string, enum: [mint, blue, yellow, pink, lav, peach]}
+        tool: {type: string, enum: [cube, paper, wrench, pencil, mug, lens, none]}
+        glasses: {type: boolean}
+    Todo:
+      type: object
+      properties:
+        id: {type: string}
+        title: {type: string}
+        description: {type: string}
+        note: {type: string}
+        status: {type: string, enum: [todo, in_progress, waiting, done]}
+        project_id: {type: string}
+        source: {type: string, enum: [self, agent, intake_form, intake_api]}
+        creator_kind: {type: string}
+        creator_id: {type: string}
+        creator_name: {type: string}
+        delegate_id: {type: string}
+        lane: {type: string}
+        due: {type: string}
+        steps: {type: array, items: {type: string}}
+        step: {type: integer}
+        intake_id: {type: string}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time, nullable: true}

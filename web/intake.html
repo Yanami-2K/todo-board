@@ -1,0 +1,29 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登记一件事</title>
+<link rel="stylesheet" href="/css/v3.css"><link rel="stylesheet" href="/css/intake.css"><link rel="stylesheet" href="/css/extra.css"></head>
+<body>
+<header class="nav"><a class="logo" href="/"><span class="lg" id="lg"></span><b><span class="me"></span><i>.</i></b></a>
+<div class="navr"><a class="np" href="#form">登记一件事</a><a class="np on" href="/" id="home">主页 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12L12 4M6 4h6v6"/></svg></a></div></header>
+<main class="page" style="padding-bottom:40px">
+<section class="ihero"><div>
+ <span class="eyebrow"><svg viewBox="-10 -10 20 20"><path d="M0 -9 l3 7 7 1 -5 5 1 7 -6 -4 -6 4 1 -7 -5 -5 7 -1z" fill="#ff6f91" stroke="#3b2f4a" stroke-width="2.5" stroke-linejoin="round"/></svg>HELLO · 想找我帮忙？</span>
+ <div style="margin-top:30px" id="name"></div>
+ <p class="intro" id="intro"></p>
+ <div class="ipills"><span style="background:var(--blue)">通常 1 天内回复</span><span style="background:var(--mint)">接受后邮件通知你</span><span style="background:var(--lav)">Agent 走 API / MCP</span></div>
+</div>
+<div class="kwin"><div class="in"><span class="live"><i></i>OPEN · 收件中</span><span class="bub r" id="kb"></span><span class="pt" id="mascot"></span>
+ <svg class="letter" viewBox="0 0 84 62"><rect x="3" y="3" width="78" height="56" rx="8" fill="#fffdf9" stroke="#3b2f4a" stroke-width="4"/><path d="M6 8 L42 34 L78 8" fill="none" stroke="#3b2f4a" stroke-width="4" stroke-linejoin="round"/><path transform="translate(42,40)" d="M0 6 C-12 -2 -9 -12 -3 -11 C-1 -11 0 -9 0 -8 C0 -9 1 -11 3 -11 C9 -12 12 -2 0 6Z" fill="#ff6f91" stroke="#3b2f4a" stroke-width="3"/></svg>
+</div><span class="est">REPLY ≤ 24H</span></div>
+</section>
+<div class="tapes"><div class="tape"><div class="track" id="t1"></div></div><div class="tape pk"><div class="track" id="t2"></div></div></div>
+<section class="fwrap" id="form">
+ <div class="form" id="fbox"></div>
+ <aside class="side">
+  <div class="scard" style="background:var(--yellow)"><h4>接下来会怎样</h4><ol><li>登记先进 <span class="me"></span> 的收件箱，不会直接上看板</li><li>他看过后接受或婉拒，接受时决定谁来做</li><li>有结果会发邮件告诉你</li></ol></div>
+  <div class="scard" style="background:var(--blue)"><h4>你是 Agent？</h4><p id="agenthint"></p><div class="code" id="code"></div></div>
+ </aside>
+</section>
+<p class="foot"><span class="me"></span> · todo 公开登记页 · 只收你填写的内容，不需要登录</p>
+</main>
+<script src="/js/pets.js"></script>
+<script src="/js/intake.js"></script>
+</body></html>
