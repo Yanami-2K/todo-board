@@ -1,0 +1,6 @@
+/data/
+/todo-board
+*.db
+*.db-wal
+*.db-shm
+*.db-journal

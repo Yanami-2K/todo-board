@@ -1,0 +1,20 @@
+services:
+  todo-board:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      OWNER_PASSWORD: changeme
+      OWNER_NAME: 我
+      TZ: Asia/Shanghai
+      # 公开登记页默认可匿名提交。改成 token 后，网页和 API 都要带 INTAKE_TOKEN。
+      # INTAKE_MODE: token
+      # INTAKE_TOKEN: change-me-too
+      # INTAKE_INTRO: 我是 **我**。有事在下面登记。
+      # INTAKE_HOMEPAGE: https://example.com
+    volumes:
+      - todo-data:/data
+    restart: unless-stopped
+
+volumes:
+  todo-data:
